@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: image-classifier-service
+  name: git-shield-service
   labels:   
-    app: image-classifier
+    app: git-shield
 spec:
   selector:
-    app: image-classifier  
+    app: git-shield  
   ports:
     - name: http
       protocol: TCP

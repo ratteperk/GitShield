@@ -1,13 +1,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: image-classifier-monitor
+  name: git-shield-monitor
   labels:
     release: kube-prom
 spec:
   selector:
     matchLabels:
-      app: image-classifier
+      app: git-shield
   namespaceSelector:
     any: true  
   endpoints:

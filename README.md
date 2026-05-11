@@ -2,7 +2,7 @@
 ---
 
 ## To Do:
-- [ ] Configure ArgoCD for GitOps-driven Kubernetes deployments
+- [x] Configure ArgoCD for GitOps-driven Kubernetes deployments
 - [ ] Implement Gatekeeper policies for security enforcement
 - [x] Integrate Trivy in GitHub Actions for container scanning
 - [x] Deploy Prometheus for metrics 
