@@ -1,0 +1,81 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  APP_NAME: git-shield
+  PORT: '{{default "4123" .PORT}}'
+  ARGOCD_VERSION: v2.10.4 
+  ARGOCD_NS: argocd
+
+tasks:
+  default:
+    desc: "List all available tasks"
+    silent: true
+    cmds:
+      - task --list
+
+  run:
+    desc: "Run application locally"
+    cmds:
+      - go run cmd/main.go
+
+  build:
+    desc: "Build the Go binary"
+    cmds:
+      - go build -o bin/{{.APP_NAME}} cmd/main.go
+
+  argocd:install:
+    desc: "Install ArgoCD (skips if already installed)"
+    status:
+      - kubectl get deployment argocd-server -n {{.ARGOCD_NS}} >/dev/null 2>&1
+    cmds:
+      - kubectl create namespace {{.ARGOCD_NS}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl apply -n {{.ARGOCD_NS}} -f https://raw.githubusercontent.com/argoproj/argo-cd/{{.ARGOCD_VERSION}}/manifests/install.yaml
+      - echo "Waiting for ArgoCD components to spin up..."
+      - kubectl wait --for=condition=available deployment/argocd-server -n {{.ARGOCD_NS}} --timeout=300s
+      - kubectl wait --for=condition=available deployment/argocd-repo-server -n {{.ARGOCD_NS}} --timeout=300s
+      - kubectl rollout status statefulset/argocd-application-controller -n {{.ARGOCD_NS}} --timeout=300s
+
+  argocd:bootstrap:
+    desc: "Full GitOps setup: Install ArgoCD -> Apply Root App"
+    deps: [argocd:install]
+    cmds:
+      - echo "Waiting for ArgoCD CRDs to be registered in the cluster API..."
+      - kubectl wait --for=condition=established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=60s
+      - echo "Applying root GitOps application..."
+      - kubectl apply -f argo-cd.yaml
+      - echo "✅ GitOps loop successfully initialized!"
+
+  argocd:info:
+    desc: "Get UI access info and initial admin password"
+    silent: true
+    cmds:
+      - echo "=========================================="
+      - echo "🌐 URL > https://localhost:8080"
+      - echo "👤 Username > admin"
+      - echo -n "🔑 Password > "
+      - |
+        while ! kubectl -n {{.ARGOCD_NS}} get secret argocd-initial-admin-secret >/dev/null 2>&1; do
+          sleep 1
+        done
+      - kubectl -n {{.ARGOCD_NS}} get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+      - echo ""
+      - echo "=========================================="
+      - echo "👉 Run 'task argocd:ui' in a separate terminal tab to open the tunnel."
+
+  argocd:ui:
+    desc: "Port-forward ArgoCD UI to localhost:8080 (BLOCKING)"
+    cmds:
+      - kubectl port-forward svc/argocd-server -n {{.ARGOCD_NS}} 8080:443
+
+  argocd:teardown:
+    desc: "🚨 DANGER: Remove ArgoCD completely from the cluster"
+    prompt: "Are you sure you want to completely delete ArgoCD and all managed GitOps resources?"
+    cmds:
+      - echo "Gracefully deleting ArgoCD Applications to release finalizers..."
+      - kubectl delete applications.argoproj.io --all -n {{.ARGOCD_NS}} --timeout=60s || true
+      - echo "Removing ArgoCD core components..."
+      - kubectl delete -n {{.ARGOCD_NS}} -f https://raw.githubusercontent.com/argoproj/argo-cd/{{.ARGOCD_VERSION}}/manifests/install.yaml --ignore-not-found
+      - kubectl delete namespace {{.ARGOCD_NS}} --ignore-not-found
+      - echo "✅ ArgoCD teardown complete."

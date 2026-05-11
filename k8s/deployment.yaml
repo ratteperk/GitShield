@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: image-classifier-deployment
+  name: git-shield-deployment
   labels:
-    app: image-classifier
+    app: git-shield
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: image-classifier
+      app: git-shield
   template:
     metadata:
       labels:
-        app: image-classifier
+        app: git-shield
     spec:
       terminationGracePeriodSeconds: 1
       containers:
-      - name: image-classifier
-        image: image-classifier:latest
+      - name: git-shield
+        image: ghcr.io/ratteperk/gitshield:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 4123
-        imagePullPolicy: Never
         resources:
           requests:
             memory: "512Mi"
