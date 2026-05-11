@@ -10,5 +10,5 @@
 - [ ] Set up Alertmanager with Telegram notifications
 - [ ] Deploy Grafana Loki for centralized log aggregation
 - [x] Containerize sample app with /health, /metrics endpoints
-- [ ] Demonstrate self-healing: pod failure → auto-recovery
-- [ ] GitHub Actions
+- [x] Demonstrate self-healing: pod failure → auto-recovery
+- [x] GitHub Actions
