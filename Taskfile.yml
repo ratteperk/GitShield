@@ -79,3 +79,14 @@ tasks:
       - kubectl delete -n {{.ARGOCD_NS}} -f https://raw.githubusercontent.com/argoproj/argo-cd/{{.ARGOCD_VERSION}}/manifests/install.yaml --ignore-not-found
       - kubectl delete namespace {{.ARGOCD_NS}} --ignore-not-found
       - echo "✅ ArgoCD teardown complete."
+
+  grafana:ui:
+    desc: "Port-forward Grafana UI to localhost:3000"
+    silent: true
+    cmds:
+      - echo "=========================================="
+      - echo "📊 Grafana URL > http://localhost:3000"
+      - echo "👤 Username > admin"
+      - echo "🔑 Password > admin"
+      - echo "=========================================="
+      - kubectl port-forward svc/grafana -n monitoring 3000:80
