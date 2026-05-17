@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gitshield-alerts
+  labels:
+    release: kube-prom
+spec:
+  groups:
+  - name: gitshield.rules
+    rules:
+    - alert: PodCrashLooping
+      expr: kube_pod_container_status_restarts_total > 2
+      for: 30s
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod crash looping"
+        description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} restarted {{ $value }} times"
+        
+    - alert: HighMemoryUsage
+      expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High memory usage"
+        description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} uses {{ $value | humanizePercentage }} of memory limit"

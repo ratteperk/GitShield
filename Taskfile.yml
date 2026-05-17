@@ -44,7 +44,7 @@ tasks:
       - echo "Waiting for ArgoCD CRDs to be registered in the cluster API..."
       - kubectl wait --for=condition=established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=60s
       - echo "Applying root GitOps application..."
-      - kubectl apply -f argo-cd.yaml
+      - kubectl apply -f root-app.yaml
       - echo "✅ GitOps loop successfully initialized!"
 
   argocd:info:
