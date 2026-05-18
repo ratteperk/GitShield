@@ -56,13 +56,13 @@ Before you begin, ensure you have the following installed:
 | Git | ≥ 2.30 | Version control |
 | Task (optional) | ≥ 3.20 | Task runner (see `Taskfile.yaml`) |
 
-Install Minikube with Kubernetes support:
+Install and run the Application:
 
 ```bash
 # Start minikube
 minikube start --cpus=4 --memory=8g
 
-task argocd:bootstrap
+task deploy:all
 ```
 
 ## Access Services
@@ -71,7 +71,7 @@ Quick setup with convenient ports:
 
 | Service | Command to activate UI | Link to UI      | Login and password |
 |---------|------------------|-----------------------|--------------------|
-| ArgoCD  | `task argocd:ui` | http://localhost:8080 | `task atgocd:info` |
+| ArgoCD  | `task argocd:ui` | http://localhost:8080 | `task argocd:info` |
 | Grafana | `task grafana:ui`| http://localhost:3000 | login: admin, password: admin |
 | Prometheus| `kubectl port-forward svc/kube-prometheus-kube-prome-prometheus -n monitoring 9090:9090` | http://localhost:9090 | - |
 | Alertmanager | `kubectl port-forward svc/alertmanager -n monitoring 9093:9093` | http://localhost:9093 | - |
@@ -142,24 +142,28 @@ kubectl create secret generic <name> --from-literal=key=value -n <namespace>
 gitshield/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml             # GitHub Actions CI/CD pipeline
-├── apps/
-│   ├── alertmanager.yaml      # Alertmanager Helm configuration
-│   ├── gitshield-app.yaml     # Main application ArgoCD deployment
-│   ├── grafana.yaml           # Grafana Helm configuration
-│   └── loki.yaml              # Loki stack configuration
-├── cmd/
-│   └── main.go                # Go application entry point
-├── k8s/
-│   ├── alert-rules.yaml       # Prometheus alerting rules
-│   ├── deployment.yaml        # Kubernetes deployment manifest
-│   ├── hpa.yaml               # Horizontal Pod Autoscaler
-│   ├── service.yaml           # Kubernetes service manifest
-│   └── servicemonitor.yaml    # Prometheus ServiceMonitor
-├── Dockerfile                 # Container image definition
-├── go.mod                     # Go module dependencies
-├── go.sum                     # Go module checksums
-├── root-app.yaml              # ArgoCD root application (App-of-Apps)
-├── Taskfile.yml               # Task definitions for automation
-└── README.md                  # This file
+│       └── ci.yml                             # GitHub Actions CI/CD pipeline
+├── apps          
+│   ├── alertmanager.yaml                      # Alertmanager Helm configuration
+│   ├── gatekeeper-policies.yaml               # ArgoCD Application manifest that deploys Gatekeeper constraint templates and constraints
+│   ├── gatekeeper.yaml                        # ArgoCD Application manifest that installs the OPA Gatekeeper Helm chart (controllers, audit, webhooks)
+│   ├── gitshield-app.yaml                     # Main application ArgoCD deployment
+│   ├── grafana.yaml                           # Grafana Helm configuration
+│   └── loki.yaml                              # Loki stack configuration
+├── cmd/                 
+│   └── main.go                                # Go application entry point
+├── k8s/                 
+│   ├── alert-rules.yaml                       # Prometheus alerting rules
+│   ├── deployment.yaml                        # Kubernetes deployment manifest
+│   ├── gatekeeper-constraint-template.yaml    # Defines custom Rego policy templates (CRDs) for admission control (e.g., allowed registries, resource quotas, non-root)
+│   ├── gatekeeper-constraints.yaml            # Instantiates the templates with actual enforcement rules, namespace/kind matchers, and exemptions
+│   ├── hpa.yaml                               # Horizontal Pod Autoscaler
+│   ├── service.yaml                           # Kubernetes service manifest
+│   └── servicemonitor.yaml                    # Prometheus ServiceMonitor
+├── Dockerfile                                 # Container image definition
+├── go.mod                                     # Go module dependencies
+├── go.sum                                     # Go module checksums
+├── root-app.yaml                              # ArgoCD root application (App-of-Apps)
+├── Taskfile.yml                               # Task definitions for automation
+└── README.md                                  # This file
 ```
