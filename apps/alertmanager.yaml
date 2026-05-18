@@ -27,15 +27,23 @@ spec:
               bot_token_file: /etc/alertmanager/secrets/bot_token
               chat_id: 931027118
               send_resolved: true
-              message: '{{ template "telegram.default.message" . }}'
-              parse_mode: HTML
         alertmanagerSpec:
           useExistingSecret: true
-          existingSecret:
-            name: alertmanager-telegram-secret
-            telegramBotToken:
-              key: bot_token
-              mountPath: /etc/alertmanager/secrets/bot_token
+          existingSecret: alertmanager-telegram-secret
+          templates:
+            - name: telegram.tmpl
+              content: |
+                {{ define "telegram.default.message" }}
+                *Alert:* {{ .CommonLabels.alertname }}
+                *Severity:* {{ .CommonLabels.severity }}
+                *Description:* {{ .CommonAnnotations.description }}
+                {{ end }}
+        extraSecretMounts:
+          - name: telegram-secret
+            mountPath: /etc/alertmanager/secrets
+            subPath: ""
+            secretName: alertmanager-telegram-secret
+            readOnly: true
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
