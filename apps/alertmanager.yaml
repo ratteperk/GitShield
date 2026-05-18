@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alertmanager
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: alertmanager
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 1.36.0
+    helm:
+      values: |
+        config:
+          global:
+            resolve_timeout: 5m
+          route:
+            receiver: 'telegram'
+            group_by: ['alertname', 'severity']
+            group_wait: 10s
+            group_interval: 10s
+            repeat_interval: 1h
+          receivers:
+          - name: 'telegram'
+            telegram_configs:
+            - api_url: https://api.telegram.org
+              bot_token_file: /etc/alertmanager/secrets/bot_token
+              chat_id: 931027118
+              send_resolved: true
+        alertmanagerSpec:
+          useExistingSecret: true
+          existingSecret: alertmanager-telegram-secret
+          templates:
+            - name: telegram.tmpl
+              content: |
+                {{ define "telegram.default.message" }}
+                *Alert:* {{ .CommonLabels.alertname }}
+                *Severity:* {{ .CommonLabels.severity }}
+                *Description:* {{ .CommonAnnotations.description }}
+                {{ end }}
+        extraSecretMounts:
+          - name: telegram-secret
+            mountPath: /etc/alertmanager/secrets
+            subPath: ""
+            secretName: alertmanager-telegram-secret
+            readOnly: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
