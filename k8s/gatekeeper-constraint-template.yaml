@@ -1,0 +1,174 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: allowedregistries
+spec:
+  crd:
+    spec:
+      names:
+        kind: AllowedRegistries
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package allowedregistries
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        image := container.image
+        not startswith(image, "docker.io/")
+        not startswith(image, "ghcr.io/")
+        not startswith(image, "gcr.io/")
+        not startswith(image, "quay.io/")
+        msg := sprintf("Image '%v' is from an unauthorized registry.", [image])
+      }
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.initContainers[_]
+        image := container.image
+        not startswith(image, "docker.io/")
+        not startswith(image, "ghcr.io/")
+        not startswith(image, "gcr.io/")
+        not startswith(image, "quay.io/")
+        msg := sprintf("Init container image '%v' is from an unauthorized registry.", [image])
+      }
+
+---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requireresourcequotas
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequireResourceQuotas
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package requireresourcequotas
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        not container.resources.limits
+        msg := sprintf("Container '%v' missing resource limits", [container.name])
+      }
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        not container.resources.requests
+        msg := sprintf("Container '%v' missing resource requests", [container.name])
+      }
+
+---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: noprivilegedcontainers
+spec:
+  crd:
+    spec:
+      names:
+        kind: NoPrivilegedContainers
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package noprivilegedcontainers
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        container.securityContext.privileged == true
+        msg := sprintf("Container '%v' is running in privileged mode", [container.name])
+      }
+
+---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requirenonrootuser
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequireNonRootUser
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package requirenonrootuser
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        not container.securityContext
+        msg := sprintf("Container '%v' missing securityContext", [container.name])
+      }
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        container.securityContext.runAsNonRoot == false
+        msg := sprintf("Container '%v' explicitly allows root user", [container.name])
+      }
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        container.securityContext.runAsUser == 0
+        msg := sprintf("Container '%v' runs as root (UID 0)", [container.name])
+      }
+
+---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: requireimagetag
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequireImageTag
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            exemptImages:
+              type: array
+              items:
+                type: string
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package requireimagetag
+
+      exemption(image) {
+        exempt := input.parameters.exemptImages[_]
+        startswith(image, exempt)
+      }
+
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        image := container.image
+        endswith(image, ":latest")
+        not exemption(image)
+        msg := sprintf("Container '%v' uses mutable ':latest' tag: %v", [container.name, image])
+      }

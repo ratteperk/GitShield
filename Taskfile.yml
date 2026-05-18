@@ -44,7 +44,7 @@ tasks:
       - echo "Waiting for ArgoCD CRDs to be registered in the cluster API..."
       - kubectl wait --for=condition=established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=60s
       - echo "Applying root GitOps application..."
-      - kubectl apply -f argo-cd.yaml
+      - kubectl apply -f root-app.yaml
       - echo "✅ GitOps loop successfully initialized!"
 
   argocd:info:
@@ -90,3 +90,48 @@ tasks:
       - echo "🔑 Password > admin"
       - echo "=========================================="
       - kubectl port-forward svc/grafana -n monitoring 3000:80
+
+  gatekeeper:test:
+    desc: "Test policies against current manifests"
+    cmds:
+      - echo "🔍 Validating deployment.yaml against policies..."
+      - kubectl apply --dry-run=server -f k8s/deployment.yaml 2>&1 | grep -E "(denied|admission)" || echo "✅ Deployment passes policy checks"
+
+  gatekeeper:install:
+    desc: "Install OPA Gatekeeper via Helm"
+    cmds:
+      - "helm repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts || true"
+      - "helm upgrade --install gatekeeper gatekeeper/gatekeeper --namespace gatekeeper-system --create-namespace --version 3.14.0 --wait --timeout 5m"
+      - echo "✅ Gatekeeper installed"
+
+  gatekeeper:policies:
+    desc: "Apply Gatekeeper constraint templates and constraints"
+    deps: [gatekeeper:install]
+    cmds:
+      - echo "📜 Applying constraint templates..."
+      - kubectl apply -f k8s/gatekeeper-constraint-template.yaml
+      - echo "⏳ Waiting for CRDs to register..."
+      - sleep 5
+      - echo "🔐 Applying constraints..."
+      - kubectl apply -f k8s/gatekeeper-constraints.yaml
+      - echo "✅ Gatekeeper policies applied"
+
+  deploy:all:
+    desc: "🚀 Core deployment: ArgoCD → Gatekeeper → App"
+    cmds:
+      - echo "1. Installing ArgoCD..."
+      - task: argocd:install
+      
+      - echo "2. Installing Gatekeeper engine..."
+      - task: gatekeeper:install
+      
+      - echo "3. Applying Gatekeeper policies..."
+      - task: gatekeeper:policies
+      
+      - echo " 4. Bootstrapping GitOps apps..."
+      - task: argocd:bootstrap
+      
+      - echo " Triggering ArgoCD sync (runs in background)..."
+      - argocd app sync git-shield-app -n argocd --async || true
+      
+      - echo "✅ Deployment triggered! ArgoCD is syncing..."

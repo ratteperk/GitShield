@@ -14,20 +14,27 @@ spec:
       labels:
         app: git-shield
     spec:
-      terminationGracePeriodSeconds: 1
       containers:
       - name: git-shield
         image: ghcr.io/ratteperk/gitshield:latest
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         imagePullPolicy: Always
         ports:
-        - containerPort: 4123
+        - name: http
+          containerPort: 4123
         resources:
           requests:
-            memory: "512Mi"
             cpu: "250m"
+            memory: "512Mi"
           limits:
-            memory: "1Gi"
             cpu: "1"
+            memory: "1Gi"
         readinessProbe:
           httpGet:
             path: /health
@@ -38,6 +45,6 @@ spec:
           httpGet:
             path: /health
             port: 4123
-          initialDelaySeconds: 30
+          initialDelaySeconds: 15
           periodSeconds: 10
           failureThreshold: 5
