@@ -69,17 +69,97 @@ task argocd:bootstrap
 
 Quick setup with convenient ports:
 
-| Service | Command to activate UI | Link to UI      |
-|---------|------------------|-----------------------|
-| ArgoCD  | `task argocd:ui` | http://localhost:8080 |
-| Grafana | `task grafana:ui`| http://localhost:3000 |
-| Prometheus| `kubectl port-forward svc/kube-prometheus-kube-prome-prometheus -n monitoring 9090:9090` | http://localhost:9090 |
-| Alertmanager | `kubectl port-forward svc/alertmanager -n monitoring 9093:9093` | http://localhost:9093 |
+| Service | Command to activate UI | Link to UI      | Login and password |
+|---------|------------------|-----------------------|--------------------|
+| ArgoCD  | `task argocd:ui` | http://localhost:8080 | `task atgocd:info` |
+| Grafana | `task grafana:ui`| http://localhost:3000 | login: admin, password: admin |
+| Prometheus| `kubectl port-forward svc/kube-prometheus-kube-prome-prometheus -n monitoring 9090:9090` | http://localhost:9090 | - |
+| Alertmanager | `kubectl port-forward svc/alertmanager -n monitoring 9093:9093` | http://localhost:9093 | - |
 
 ## Configuration
 
 ### Telegram Bot Setup
 
+1) Create a telegram bot
+2) Get your chat ID
+3) Create Kubernetes secret with bot token:
+
+```bash
+kubectl create secret generic alertmanager-telegram-secret \
+  --from-literal=bot_token='YOUR_BOT_TOKEN_HERE' -n monitoring
+```
+
+4) Update Alertmanager config: Replace `chat_id` with actual ID
+5) Commit and push changes
+6) Restart alertmanager
+
+```bash
+kubectl delete pod -l app.kubernetes.io/name=alertmanager -n monitoring
+```
+
+7) Try test notification:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: test-telegram-alert
+  namespace: monitoring
+  labels:
+    release: kube-prometheus
+spec:
+  groups:
+  - name: test.rules
+    interval: 30s
+    rules:
+    - alert: TelegramNotificationTest
+      expr: vector(1) == 1
+      for: 10s
+      labels:
+        severity: critical
+      annotations:
+        summary: "Test Alert"
+        description: "Verifying Telegram integration"
+EOF
+```
+
+8) Check your telegram
+
 ### Secrets Managment
 
+* Bot tokens and sensitive data are stored in Kubernetes Secrets, not in Git
+* Secrets are mounted as files inside pods (e.g., `/etc/alertmanager/secrets/bot_token`)
+* Applications read tokens from files, not environment variables
+
+Create a secret:
+```bash
+kubectl create secret generic <name> --from-literal=key=value -n <namespace>
+```
+
 ## Project Structure
+
+```bash
+gitshield/
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # GitHub Actions CI/CD pipeline
+├── apps/
+│   ├── alertmanager.yaml      # Alertmanager Helm configuration
+│   ├── gitshield-app.yaml     # Main application ArgoCD deployment
+│   ├── grafana.yaml           # Grafana Helm configuration
+│   └── loki.yaml              # Loki stack configuration
+├── cmd/
+│   └── main.go                # Go application entry point
+├── k8s/
+│   ├── alert-rules.yaml       # Prometheus alerting rules
+│   ├── deployment.yaml        # Kubernetes deployment manifest
+│   ├── hpa.yaml               # Horizontal Pod Autoscaler
+│   ├── service.yaml           # Kubernetes service manifest
+│   └── servicemonitor.yaml    # Prometheus ServiceMonitor
+├── Dockerfile                 # Container image definition
+├── go.mod                     # Go module dependencies
+├── go.sum                     # Go module checksums
+├── root-app.yaml              # ArgoCD root application (App-of-Apps)
+├── Taskfile.yml               # Task definitions for automation
+└── README.md                  # This file
+```
